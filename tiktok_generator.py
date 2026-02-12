@@ -69,9 +69,13 @@ Feel like a real workflow
 Explicitly mention empty space in the LOWER HALF of the frame for captions.
 The prompt must describe ONLY the visual scene (objects, lighting, setting).
 Do NOT include the text of the slogan, hook, or caption in the image prompt.
-Do NOT describe words. Describe the physical objects. 
+Do NOT describe words, letters, signs, screens with text, or documents. 
+Do NOT ask for "mission statements", "code on screen", or "labels".
+Describe the physical objects or abstract concepts only.
 Example bad prompt: "A screen saying 30 Day AI Mastery"
-Example good prompt: "A close up of a laptop screen displaying code with a coffee cup nearby"
+Example bad prompt: "A mission statement visible on the wall"
+Example good prompt: "A close up of a laptop screen displaying abstract geometric data patterns with a coffee cup nearby"
+Example good prompt: "A person confidently presenting to a virtual audience, the background is a blurred modern office."
 
 • Captions:
 
