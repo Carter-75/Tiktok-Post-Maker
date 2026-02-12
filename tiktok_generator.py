@@ -9,10 +9,17 @@ from colorama import init, Fore, Style
 from datetime import datetime
 import msvcrt
 import sys
+import time
 import re # For sanitization
 import tiktok_uploader # Import the uploader module
 from PIL import Image, ImageDraw, ImageFont # For text rendering
+
+# PATCH: Fix for moviepy 1.0.3 using Pillow 10+
+if not hasattr(Image, 'ANTIALIAS'):
+    Image.ANTIALIAS = Image.LANCZOS
+
 import textwrap # For wrapping text
+from moviepy.editor import ImageClip, concatenate_videoclips, CompositeVideoClip
 
 # Initialize colorama
 init(autoreset=True)
@@ -376,6 +383,67 @@ def generate_all_images():
     for i in range(1, 6):
         generate_image(i)
         
+def generate_slideshow():
+    """Compiles generated images into a video slideshow with transitions."""
+    print(Fore.CYAN + "\nGenerating video slideshow...")
+    
+    output_dir = "output"
+    if not os.path.exists(output_dir):
+        print(Fore.RED + "Output directory not found.")
+        return
+
+    # Get images sorted by slide number
+    images = [os.path.join(output_dir, f) for f in os.listdir(output_dir) if f.endswith(('.png', '.jpg', '.jpeg')) and 'slide_' in f]
+    images.sort(key=lambda x: int(x.split('slide_')[1].split('_')[0]))
+
+    if not images:
+        print(Fore.RED + "No images found to generate video.")
+        return
+
+    try:
+        clips = []
+        for img_path in images:
+            # Create ImageClip, set duration to 3.0 seconds
+            # 2.5s for static + 0.5s for transition overlap = ~2.0s clear viewing time
+            # Resize to ensure 1080x1920 (TikTok 9:16)
+            clip = ImageClip(img_path).set_duration(3.0).resize(newsize=(1080, 1920))
+            clips.append(clip)
+        
+        # Concatenate with crossfade transition
+        # We need to set start times for crossfades or use a method that handles it
+        # Simple method: crossfadein on each clip (except first)
+        
+        # improved method for smooth transition:
+        # We will overlap clips by 0.5 seconds and crossfade
+        final_clips = [clips[0]]
+        for clip in clips[1:]:
+            # Make the clip fade in over the previous one
+            final_clips.append(clip.crossfadein(0.5))
+        
+        # CompositeVideoClip allows layering; concatenate_videoclips with padding/overlap is cleaner for slideshows
+        # Let's use compose method for simple crossfades
+        video = concatenate_videoclips(final_clips, method="compose", padding=-0.5) 
+        
+        output_path = os.path.join(output_dir, "final_video.mp4")
+        
+        # Write video file
+        # fps=24 is sufficient for static slides
+        video.write_videofile(
+            output_path, 
+            fps=24, 
+            codec="libx264", 
+            audio=False, 
+            preset="medium",
+            threads=4
+        )
+        
+        print(Fore.GREEN + f"\nVideo generated successfully: {output_path}")
+        return output_path
+
+    except Exception as e:
+        print(Fore.RED + f"Error generating video: {e}")
+        return None
+
 def upload_post():
     """Triggers the Selenium uploader."""
     global last_generated_content
@@ -422,6 +490,11 @@ def main():
             generate_carousel()
         elif command == "ALL":
             generate_all_images()
+            # Auto-generate video after ALL
+            time.sleep(1)
+            generate_slideshow()
+        elif command == "VIDEO":
+            generate_slideshow()
         elif command == "POST":
             upload_post()
         elif command.startswith("#") and command[1:].isdigit():

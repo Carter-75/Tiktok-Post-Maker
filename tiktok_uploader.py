@@ -2,23 +2,22 @@ import os
 import time
 import json
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
-from dotenv import load_dotenv # Need to load dotenv here too
+from selenium.webdriver.common.keys import Keys
+import undetected_chromedriver as uc
+from dotenv import load_dotenv
 from colorama import init, Fore
 
 init(autoreset=True)
-load_dotenv() # Load environment variables
+load_dotenv()
 
 def upload_to_tiktok(description, hashtags, audio_path=None):
     print(Fore.CYAN + "\nStarting TikTok Uploader...")
 
     # 1. Setup Chrome Options
-    chrome_options = Options()
+    chrome_options = uc.ChromeOptions()
     
     # 1.1 Support attaching to existing browser process
     debugger_port = os.getenv("TIKTOK_DEBUGGER_PORT")
@@ -30,7 +29,7 @@ def upload_to_tiktok(description, hashtags, audio_path=None):
         # Use a local profile to persist login cookies
         script_dir = os.path.dirname(os.path.abspath(__file__))
         profile_dir = os.path.join(script_dir, "chrome_profile")
-        chrome_options.add_argument(f"user-data-dir={profile_dir}")
+        chrome_options.add_argument(f"--user-data-dir={profile_dir}")
     
     # Suppress logging
     chrome_options.add_argument("--log-level=3")
@@ -44,7 +43,8 @@ def upload_to_tiktok(description, hashtags, audio_path=None):
     print(Fore.YELLOW + "Launching Browser... (If this is your first time, you will need to log in)")
     
     try:
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        # undetected-chromedriver handles driver management automatically
+        driver = uc.Chrome(options=chrome_options)
     except Exception as e:
         print(Fore.RED + "Failed to launch browser. Ensure you have the correct driver installed or use Google Chrome.")
         print(f"Error: {e}")
@@ -69,35 +69,29 @@ def upload_to_tiktok(description, hashtags, audio_path=None):
         except:
             pass
 
-        # 4. Upload Images
-        print(Fore.CYAN + "Preparing to upload images...")
+        # 4. Upload Video
+        print(Fore.CYAN + "Preparing to upload video...")
         
-        # Get absolute paths of images in output/ folder
+        # Get absolute path of video
         output_dir = os.path.join(script_dir, "output")
-        if not os.path.exists(output_dir):
-            print(Fore.RED + "No /output directory found!")
+        video_path = os.path.join(output_dir, "final_video.mp4")
+        
+        if not os.path.exists(video_path):
+            print(Fore.RED + "No final_video.mp4 found in /output! Generate video first.")
             return
 
-        images = [os.path.join(output_dir, f) for f in os.listdir(output_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
-        # Sort by slide number (assuming filename contains slide_N)
-        images.sort(key=lambda x: int(x.split('slide_')[1].split('_')[0]) if 'slide_' in x else x)
-        
-        if not images:
-            print(Fore.RED + "No images found in /output to upload.")
-            return
-
-        print(Fore.WHITE + f"Found {len(images)} images.")
-        
-        # Locate the file input (iframe handling might be needed depending on TikTok's current DOM)
-        # TikTok's upload input is usually hidden.
-        # We try to find the input[type='file']
+        print(Fore.WHITE + f"Uploading video: {video_path}")
         
         try:
             file_input = WebDriverWait(driver, 20).until(
                 EC.presence_of_element_located((By.XPATH, "//input[@type='file']"))
             )
-            file_input.send_keys("\n".join(images))
-            print(Fore.GREEN + "Images uploaded to browser.")
+            
+            # We don't need to force multiple or change accept for video, 
+            # as the default input expects video.
+            
+            file_input.send_keys(video_path)
+            print(Fore.GREEN + "Video uploaded to browser.")
         except Exception as e:
             print(Fore.RED + f"Could not find file input element. TikTok UI might have changed.\nError: {e}")
             input("Press Enter to continue...")
@@ -115,11 +109,20 @@ def upload_to_tiktok(description, hashtags, audio_path=None):
                 EC.presence_of_element_located((By.CSS_SELECTOR, ".public-DraftEditor-content"))
             )
             caption_box.click()
-            caption_box.send_keys(full_caption) # This might be flaky with emojis/newlines, but basic text works
-             # Alternatively, use clipboard or JS injection if send_keys is flaky
+            
+            # Clear existing text (filename)
+            # TikTok auto-fills filename. We need to select all and delete.
+            # Using ActionChains or Keys
+            
+            # Select all and delete
+            caption_box.send_keys(Keys.CONTROL + "a")
+            caption_box.send_keys(Keys.DELETE)
+            time.sleep(0.5) # Short pause
+            
+            caption_box.send_keys(full_caption)
             print(Fore.GREEN + "Caption set.")
-        except:
-             print(Fore.RED + "Could not automatically set caption. Please paste it manually.")
+        except Exception as e:
+             print(Fore.RED + f"Could not automatically set caption. Please paste it manually. Error: {e}")
              print(f"Caption: {full_caption}")
 
         # 6. Wait for User to Post
