@@ -1,0 +1,16 @@
+# Environment variables
+.env
+.env.local
+
+# Virtual Environment
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Output
+output/
+chrome_profile/
+
+# Install flags
+installed.flag

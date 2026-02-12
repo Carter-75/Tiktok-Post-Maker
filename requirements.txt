@@ -1,0 +1,7 @@
+openai
+python-dotenv
+requests
+colorama
+selenium
+webdriver-manager
+Pillow
